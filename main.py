@@ -1,13 +1,123 @@
 import requests
 import json
 import os
-from bs4 import BeautifulSoup as bs
 from urllib.parse import quote
 from estadisticas import exportar_stats_a_xlsx
 import premier
 
 
+# HTTP Headers for API requests
+API_HEADERS = {
+    'sec-ch-ua-platform': '"Windows"',
+    'Referer': 'https://tracker.gg/',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'sec-ch-ua': '"Chromium";v="148", "Brave";v="148", "Not/A)Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+}
+
+
+def log_message(message: str, log_viewer=None):
+    """Send message to console and/or log viewer"""
+    print(message)
+    if log_viewer is not None:
+        log_viewer.write(message)
+
+
+def fetch_competitive_stats(log_viewer=None) -> int:
+    """
+    Fetch competitive stats for all players in nombres.txt
+    Returns the number of players processed successfully
+    """
+    carpeta = 'stats'
+    if not os.path.exists(carpeta):
+        os.makedirs(carpeta)
+    
+    try:
+        with open('nombres.txt', 'r') as f:
+            nombres = f.read().strip().split('\n')
+    except FileNotFoundError:
+        log_message("Error: No se encontró el archivo nombres.txt", log_viewer)
+        return 0
+    
+    log_message("\n[cyan]Obteniendo estadísticas competitivas...[/cyan]", log_viewer)
+    
+    count = 0
+    for nombre_completo in nombres:
+        nombre_completo = nombre_completo.strip()
+        if not nombre_completo:
+            continue
+        
+        partes = nombre_completo.split('#')
+        nombre = partes[0].strip()
+        
+        nombre_encoded = quote(nombre_completo)
+        url = f'https://api.tracker.gg/api/v2/valorant/standard/profile/riot/{nombre_encoded}'
+        
+        log_message(f"  → {nombre}...", log_viewer)
+        
+        response = requests.get(url, headers=API_HEADERS)
+        
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                
+                if 'data' in data and 'segments' in data['data']:
+                    acto_actual = None
+                    stats_v26 = None
+                    season_id_premier = None
+                    
+                    # Extraer season_id_premier del metadata principal
+                    if 'metadata' in data['data'] and 'seasons' in data['data']['metadata']:
+                        seasons = data['data']['metadata']['seasons']
+                        if seasons:
+                            season_id_premier = seasons[0].get('id')
+                    
+                    # Buscar Competitivo en los segments
+                    for segment in data['data']['segments']:
+                        segment_name = segment.get('metadata', {}).get('name', '')
+                        
+                        if segment.get('type') == 'season' and acto_actual is None:
+                            acto_actual = segment_name
+                            stats_v26 = segment['stats']
+                            break
+                    
+                    if acto_actual and stats_v26:
+                        datos_principales = {
+                            'Jugador': nombre,
+                            'Acto': acto_actual,
+                            'SeasonIdPremier': season_id_premier,
+                            'Damage/Round': stats_v26.get('damagePerRound', {}).get('displayValue'),
+                            'K/D Ratio': stats_v26.get('kDRatio', {}).get('displayValue'),
+                            'Headshot %': stats_v26.get('headshotsPercentage', {}).get('displayValue'),
+                            'KAST': stats_v26.get('kAST', {}).get('displayValue'),
+                            'ACS': stats_v26.get('scorePerRound', {}).get('displayValue'),
+                            'KAD Ratio': stats_v26.get('kADRatio', {}).get('displayValue'),
+                        }
+                        
+                        archivo_nombre = os.path.join(carpeta, f"{nombre}.json")
+                        with open(archivo_nombre, 'w') as f:
+                            json.dump(datos_principales, f, indent=4)
+                        
+                        log_message(f"    [green]✓ {nombre}[/green]", log_viewer)
+                        count += 1
+                    else:
+                        log_message(f"    [yellow]⚠ {nombre} - No se encontró el ACT actual[/yellow]", log_viewer)
+                else:
+                    log_message(f"    [yellow]⚠ {nombre} - Estructura de datos no válida[/yellow]", log_viewer)
+
+            except ValueError:
+                log_message(f"    [red]✗ {nombre} - Error al procesar JSON[/red]", log_viewer)
+            except Exception as e:
+                log_message(f"    [red]✗ {nombre} - {type(e).__name__}[/red]", log_viewer)
+        else:
+            log_message(f"    [red]✗ {nombre} - Error {response.status_code}[/red]", log_viewer)
+    
+    return count
+
+
 def main():
+    """Legacy main function for CLI compatibility"""
     headers = {
     'sec-ch-ua-platform': '"Windows"',
     'Referer': 'https://tracker.gg/',
@@ -53,7 +163,7 @@ def main():
                     stats_v26 = None
                     season_id_premier = None
                     
-                    # Extraer season_id_premier del metadata principal (data['metadata']['seasons'])
+                    # Extraer season_id_premier del metadata principal
                     if 'metadata' in data['data'] and 'seasons' in data['data']['metadata']:
                         seasons = data['data']['metadata']['seasons']
                         if seasons:
@@ -63,7 +173,6 @@ def main():
                     for segment in data['data']['segments']:
                         segment_name = segment.get('metadata', {}).get('name', '')
                         
-                        # Competitivo: primer segment de tipo season
                         if segment.get('type') == 'season' and acto_actual is None:
                             acto_actual = segment_name
                             stats_v26 = segment['stats']

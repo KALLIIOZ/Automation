@@ -6,10 +6,10 @@ An automated tool for collecting and analyzing Valorant statistics from multiple
 
 ### Installing dependencies
 
-Before running the script, install the following Python libraries:
+Before running the script, install the required Python packages:
 
 ```bash
-pip install requests beautifulsoup4 pandas openpyxl
+pip install -r requirements.txt
 ```
 
 ### Required files
@@ -24,6 +24,29 @@ Lord Bane#P4DME
 ```
 
 ## 🚀 How to use
+
+### Method 1: Terminal UI (Recommended)
+
+The new interactive Terminal User Interface makes it easy to manage all operations:
+
+```bash
+python app.py
+```
+
+**Features:**
+- 🎨 Interactive menu with color-coded output
+- 📊 Real-time status updates
+- 📝 Live logs viewer
+- ✨ Clean and modern interface
+- ⚡ One-click operations
+
+**Menu Options:**
+- **▶ Fetch Stats** - Fetch competitive statistics for all players
+- **▶ Fetch Premier** - Fetch Premier division statistics
+- **▶ Export to Excel** - Export all data to Excel files
+- **▶ View Results** - See a summary of all processed data
+- **▶ Clear Logs** - Clear the log viewer
+- **✕ Exit** - Exit the application
 
 ### Step 1: Prepare player names
 Edit the `nombres.txt` file and add the players you want to monitor in the format `Name#ID`.
